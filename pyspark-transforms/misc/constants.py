@@ -1,0 +1,1 @@
+KAFKA_BROKERS = 'kafka-1:9091,kafka-2:9091,kafka-3:9091'
