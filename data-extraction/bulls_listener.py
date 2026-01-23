@@ -59,9 +59,8 @@ def bulls_listener(region=None, page=None):
                     (last_bull.find('h3').text, last_bull.find('span', {'data-ftid': 'bull_price'})):
                         break
                     else:
-                        print("[" + str(datetime.now()) + "] ", "New bulletin found. Sending to Kafka...")
-
                         bull_info, image_ids, image_bytes = create_bull_json(bull)
+                        print("[" + str(datetime.now()) + "] ", "New bulletin found. Sending to Kafka...")
                         producer.send(topic='drom.bulletin.posted', value=bull_info.encode('utf-8'))
                         # for id, image_byte in zip(image_ids, image_bytes):
                         #     producer.send(topic='drom.bulletin.picutre', key=id.encode('utf-8'), value=image_byte)
@@ -76,5 +75,11 @@ def bulls_listener(region=None, page=None):
         print("[" + str(datetime.now()) + "] ", "No Kafka brokers are available at the moment. Quiting...")
     
     except KeyboardInterrupt:
+        if last_bull:
+            with open ('data-extraction/misc/lastbulletin.pickle', 'wb') as file:
+                    pickle.dump(last_bull, file)
+        elif first_bull:
+            with open ('data-extraction/misc/lastbulletin.pickle', 'wb') as file:
+                    pickle.dump(first_bull, file)
         print("[" + str(datetime.now()) + "] ", "Listener execution is over")
         sleep(1, 0)

@@ -8,6 +8,101 @@ import json
 import boto3
 from time import sleep
 from hashlib import md5
+import threading
+import signal
+
+
+shutdown_event = threading.Event()
+
+class ThreadKafkaConsumer:
+    def __init__(self, topic: str, group_id: str, bootstrap_servers: list, session):
+        self.topic = topic
+        self.group_id = group_id
+        self.bootstrap_servers = bootstrap_servers
+        self.session = session
+
+    def start(self):
+        print(f"Creating Kafka topic {self.topic} consumer...")
+        self.thread = threading.Thread(target=self.run, daemon=True)
+        self.thread.start()
+
+    def run(self):
+        while True:
+            try:
+                self.consumer = KafkaConsumer(
+                    group_id=self.group_id,
+                    bootstrap_servers=self.bootstrap_servers,
+                    enable_auto_commit=False,
+                    auto_offset_reset='earliest',
+                )
+                break
+            except NoBrokersAvailable:
+                print("No Kafka brokers in bootstrap_servers specified are available at the moment. Retry connection after 5 sec...")
+                sleep(5)
+
+        self.consumer.subscribe([self.topic])
+        print(f"Kafka topic {self.topic} consumer created and started listening")
+
+        while not shutdown_event.is_set():
+            try:
+                messages_batch = self.consumer.poll(timeout_ms=500)
+                if not messages_batch:
+                    continue
+
+                for partition, messages in messages_batch.items():
+                    offsets = {}
+                    for message in messages:
+                        try:
+                            print(partition, message.offset)
+                            self.process_message(message.value, self.session)
+                            offsets[partition] = message.offset + 1
+
+                        except Exception as e:
+                            if shutdown_event.is_set():
+                                self.consumer.commit(offsets)
+                                self.close()
+                                return
+                            
+                            print(f"Error while reading message from batch from topic {self.topic}: {e}. Going to next message")
+                            continue
+
+                    self.consumer.commit()
+
+            except Exception as e:
+                print(f"Error while reading batch from kafka topic {self.topic}: {e}")
+                print(repr(e))
+                sleep(1)
+
+        self.consumer.commit()
+        self.close()
+
+    def close(self):
+        print(f"Closing consumer for topic {self.topic}...")
+        self.consumer.unsubscribe()
+        self.consumer.close()
+        print(f"Consumer for topic {self.topic} closed")
+
+    def join(self, timeout=5):
+        if self.thread and self.thread.is_alive():
+            self.thread.join(timeout)
+
+    def process_message(self, msg, session):
+        print(msg.decode('utf-8') if msg else "No value provided in message received") 
+
+
+
+def handle_signal(signum, frame):
+    print(f"Got signal {signum}. Performing graceful shutdown...")
+    shutdown_event.set()
+
+
+class BulletinKafkaConsumer(ThreadKafkaConsumer):
+    def __init__(self, topic: str, group_id: str, bootstrap_servers: list, session):
+        super().__init__(topic, group_id, bootstrap_servers, session)
+
+    def process_message(self, msg, session):
+        session.upload_fileobj(BytesIO(msg), BUCKET_BULLETINS, 'bulletin_' + md5(msg).hexdigest()[:8] + '.json')
+
 
 
 # def deserialize_image(img_bytes):
@@ -16,7 +111,11 @@ from hashlib import md5
 def deserialize_bulletin(bull_bytes):
     return bull_bytes.decode('utf-8')
 
+        
 def main():
+    signal.signal(signal.SIGINT, handle_signal)
+    signal.signal(signal.SIGTERM, handle_signal)
+
     print("Initializing S3 connection...")
 
     ENDPOINT = "http://MINIO-DATALAKE:9000"
@@ -38,32 +137,27 @@ def main():
     #     bootstrap_servers=CONSUMER_BOOTSTRAP_SERVERS
     #     )
 
-    print("Creating Kafka topic 'drom.bulletin.posted' consumer...")
+    try:
     
-    while True:
-        try:
-            bulletins_consumer = KafkaConsumer(
-                group_id='bulletins_csg1',
-                bootstrap_servers=CONSUMER_BOOTSTRAP_SERVERS,
-                # value_deserializer=deserialize_bulletin
-            )
-            break
-        except NoBrokersAvailable:
-            print("No Kafka brokers in bootstrap_servers specified are available at the moment. Retry connection after 5 sec...")
-            sleep(5)
+        bulletin_consumer = BulletinKafkaConsumer(
+            topic="drom.bulletin.posted",
+            group_id="bulletins_csg1",
+            bootstrap_servers=CONSUMER_BOOTSTRAP_SERVERS,
+            session=s3
+        )
 
-    print("Kafka consumer created and started listening")
+        bulletin_consumer.start()
 
-    bulletins_consumer.subscribe(['drom.bulletin.posted'])
+        while not shutdown_event.is_set():
+            sleep(1)
 
-    for bulletin in bulletins_consumer:
-        # print(json.loads(bulletin.value.decode('utf-8')))
-        print("Uploading new bulletin to MinIO Storage")
-        s3.upload_fileobj(BytesIO(bulletin.value), BUCKET_BULLETINS, 'bulletin_' + md5(bulletin.value).hexdigest()[:8] + '.json')
+    except Exception as e:
+        print(f"Error while executing Kafka Consumer occured: {e}")
+        shutdown_event.set()
+    finally:
+        bulletin_consumer.join()
+        print(f"Consumers are successfuly terminated. Exiting")
 
-
-    bulletins_consumer.unsubscribe()
-    bulletins_consumer.close()
 
 
 if __name__ == "__main__":
