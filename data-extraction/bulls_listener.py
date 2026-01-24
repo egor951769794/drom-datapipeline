@@ -62,8 +62,8 @@ def bulls_listener(region=None, page=None):
                         bull_info, image_ids, image_bytes = create_bull_json(bull)
                         print("[" + str(datetime.now()) + "] ", "New bulletin found. Sending to Kafka...")
                         producer.send(topic='drom.bulletin.posted', value=bull_info.encode('utf-8'))
-                        # for id, image_byte in zip(image_ids, image_bytes):
-                        #     producer.send(topic='drom.bulletin.picutre', key=id.encode('utf-8'), value=image_byte)
+                        for id, image_byte in zip(image_ids, image_bytes):
+                            producer.send(topic='drom.bulletin.pictures', key=id.encode('utf-8'), value=image_byte)
 
             last_bull = copy.copy(first_bull)
             with open ('data-extraction/misc/lastbulletin.pickle', 'wb') as file:

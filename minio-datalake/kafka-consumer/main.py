@@ -1,14 +1,15 @@
-from kafka import KafkaConsumer
-from kafka.errors import NoBrokersAvailable
-from constants import CONSUMER_BOOTSTRAP_SERVERS
-from constants import BUCKET_BULLETINS
-from PIL import Image
 from io import BytesIO
-import boto3
 from time import sleep
 from hashlib import md5
 import threading
 import signal
+
+import boto3
+from kafka import KafkaConsumer
+from kafka.errors import NoBrokersAvailable
+
+from constants import CONSUMER_BOOTSTRAP_SERVERS
+from constants import BUCKET_BULLETINS, BUCKET_BULLETINPICS
 
 
 shutdown_event = threading.Event()
@@ -55,8 +56,7 @@ class ThreadKafkaConsumer:
                     offsets = {}
                     for message in messages:
                         try:
-                            print(partition, message.offset)
-                            self.process_message(message.value, self.session)
+                            self.process_message(message, self.session)
                             offsets[partition] = message.offset + 1
 
                         except Exception as e:
@@ -88,8 +88,7 @@ class ThreadKafkaConsumer:
             self.thread.join(timeout)
 
     def process_message(self, msg, session):
-        print(msg.decode('utf-8') if msg else "No value provided in message received") 
-
+        print(msg.value.decode('utf-8') if msg.value else "No value provided in message received") 
 
 
 def handle_signal(signum, frame):
@@ -102,13 +101,16 @@ class BulletinKafkaConsumer(ThreadKafkaConsumer):
         super().__init__(topic, group_id, bootstrap_servers, session, max_poll)
 
     def process_message(self, msg, session):
-        session.upload_fileobj(BytesIO(msg), BUCKET_BULLETINS, 'bulletin_' + md5(msg).hexdigest()[:8] + '.json')
+        session.upload_fileobj(BytesIO(msg.value), BUCKET_BULLETINS, 'bulletin_' + md5(msg.value).hexdigest()[:8] + '.json')
 
 
+class BulletinPicsKafkaConsumer(ThreadKafkaConsumer):
+    def __init__(self, topic: str, group_id: str, bootstrap_servers: list, session, max_poll=300000):
+        super().__init__(topic, group_id, bootstrap_servers, session, max_poll)
 
-# def deserialize_image(img_bytes):
-#     image = Image.open(BytesIO(img_bytes))
-    
+    def process_message(self, msg, session):
+        session.upload_fileobj(BytesIO(msg.value), BUCKET_BULLETINPICS, msg.key.decode('utf-8') + '.jpg')
+
         
 def main():
     signal.signal(signal.SIGINT, handle_signal)
@@ -128,15 +130,9 @@ def main():
         endpoint_url=ENDPOINT
     )
 
-    print(f"S3 connection to MinIO bucket '{BUCKET_BULLETINS}' established")
-
-    # pictures_consumer = KafkaConsumer(
-    #     group_id='pictures_csg1',
-    #     bootstrap_servers=CONSUMER_BOOTSTRAP_SERVERS
-    #     )
+    print(f"S3 connection to MinIO established")
 
     try:
-    
         bulletin_consumer = BulletinKafkaConsumer(
             topic="drom.bulletin.posted",
             group_id="bulletins_csg1",
@@ -146,6 +142,16 @@ def main():
         )
 
         bulletin_consumer.start()
+
+        pictures_consumer = BulletinPicsKafkaConsumer(
+            topic="drom.bulletin.pictures",
+            group_id="bulletinpics_csg1",
+            bootstrap_servers=CONSUMER_BOOTSTRAP_SERVERS,
+            session=s3,
+            max_poll=10000
+        )
+
+        pictures_consumer.start()
 
         while not shutdown_event.is_set():
             sleep(1)
