@@ -4,7 +4,6 @@ from constants import CONSUMER_BOOTSTRAP_SERVERS
 from constants import BUCKET_BULLETINS
 from PIL import Image
 from io import BytesIO
-import json
 import boto3
 from time import sleep
 from hashlib import md5
@@ -15,11 +14,12 @@ import signal
 shutdown_event = threading.Event()
 
 class ThreadKafkaConsumer:
-    def __init__(self, topic: str, group_id: str, bootstrap_servers: list, session):
+    def __init__(self, topic: str, group_id: str, bootstrap_servers: list, session, max_poll=300000):
         self.topic = topic
         self.group_id = group_id
         self.bootstrap_servers = bootstrap_servers
         self.session = session
+        self.max_poll = max_poll
 
     def start(self):
         print(f"Creating Kafka topic {self.topic} consumer...")
@@ -34,6 +34,8 @@ class ThreadKafkaConsumer:
                     bootstrap_servers=self.bootstrap_servers,
                     enable_auto_commit=False,
                     auto_offset_reset='earliest',
+                    max_poll_interval_ms = self.max_poll,
+                    max_poll_records = 100
                 )
                 break
             except NoBrokersAvailable:
@@ -45,7 +47,7 @@ class ThreadKafkaConsumer:
 
         while not shutdown_event.is_set():
             try:
-                messages_batch = self.consumer.poll(timeout_ms=500)
+                messages_batch = self.consumer.poll(timeout_ms=1500)
                 if not messages_batch:
                     continue
 
@@ -63,14 +65,13 @@ class ThreadKafkaConsumer:
                                 self.close()
                                 return
                             
-                            print(f"Error while reading message from batch from topic {self.topic}: {e}. Going to next message")
+                            print(f"Error while reading message from batch from topic {self.topic}: {e}. Going to the next message")
                             continue
 
                     self.consumer.commit()
 
             except Exception as e:
                 print(f"Error while reading batch from kafka topic {self.topic}: {e}")
-                print(repr(e))
                 sleep(1)
 
         self.consumer.commit()
@@ -97,8 +98,8 @@ def handle_signal(signum, frame):
 
 
 class BulletinKafkaConsumer(ThreadKafkaConsumer):
-    def __init__(self, topic: str, group_id: str, bootstrap_servers: list, session):
-        super().__init__(topic, group_id, bootstrap_servers, session)
+    def __init__(self, topic: str, group_id: str, bootstrap_servers: list, session, max_poll=300000):
+        super().__init__(topic, group_id, bootstrap_servers, session, max_poll)
 
     def process_message(self, msg, session):
         session.upload_fileobj(BytesIO(msg), BUCKET_BULLETINS, 'bulletin_' + md5(msg).hexdigest()[:8] + '.json')
@@ -108,9 +109,6 @@ class BulletinKafkaConsumer(ThreadKafkaConsumer):
 # def deserialize_image(img_bytes):
 #     image = Image.open(BytesIO(img_bytes))
     
-def deserialize_bulletin(bull_bytes):
-    return bull_bytes.decode('utf-8')
-
         
 def main():
     signal.signal(signal.SIGINT, handle_signal)
@@ -143,7 +141,8 @@ def main():
             topic="drom.bulletin.posted",
             group_id="bulletins_csg1",
             bootstrap_servers=CONSUMER_BOOTSTRAP_SERVERS,
-            session=s3
+            session=s3,
+            max_poll=10000
         )
 
         bulletin_consumer.start()
