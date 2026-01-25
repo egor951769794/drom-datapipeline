@@ -12,9 +12,9 @@ def create_bull_json(bull):
 
     car = dict()
 
-    car['time_posted'] = datetime.now()
+    car['timeReceived'] = datetime.now()
     
-    car['bull_url'] = bull.find("a", {"data-ftid": "bull_title"}).attrs['href']
+    car['bullUrl'] = bull.find("a", {"data-ftid": "bull_title"}).attrs['href']
     
     car['imageUrls'] = [pic.attrs['src'] for pic in bull.find('div', {'data-ftid': 'bull_image'}).find_all('img')]
 
