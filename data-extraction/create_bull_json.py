@@ -85,7 +85,7 @@ def create_bull_json(bull):
     sleep(4, 0.7)
 
     car['color'], car['steering'], car['passportIssues'], car['ownedByCompany'], car['hasPenalties'],\
-    car['numOfOwners'], car['numOfPreviousBulls'], car['date'], additionalPhotos = get_additional_bull_info(car['bull_url'])
+    car['numOfOwners'], car['numOfPreviousBulls'], car['date'], additionalPhotos = get_additional_bull_info(car['bullUrl'])
 
     if additionalPhotos:
         car['imageUrls'] = additionalPhotos

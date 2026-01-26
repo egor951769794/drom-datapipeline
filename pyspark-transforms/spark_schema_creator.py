@@ -1,7 +1,11 @@
+from hashlib import md5
+import json
+
 from pyspark.sql import SparkSession
 from pyspark.sql.types import StructType, StructField, StringType, IntegerType, TimestampType, ArrayType, ShortType, BooleanType, FloatType
-from pyspark.sql.functions import from_json, col, expr
+from pyspark.sql.functions import from_json, col, expr, date_trunc, xxhash64, weekday, year, month, regexp_extract
 from constants import KAFKA_BROKERS
+
 
 scala_version = '2.12'
 spark_version = '3.5.8'
@@ -19,6 +23,16 @@ def create_session():
         .getOrCreate()
     
     return spark
+
+def json_dump(value):
+    return json.dumps(
+        value,
+        ensure_ascii=False,
+        indent=None
+    )
+
+def create_hash(value):
+    return md5(json_dump(value).encode('utf-8')).digest()[:8]
 
 json_schema = StructType([
     StructField("timeReceived", StringType()),
@@ -53,6 +67,48 @@ json_schema = StructType([
     StructField("imageIds", ArrayType(StringType(), True))]
 )
 
+car_columns = [
+    "manufacturer",
+    "model",
+    "year",
+    "engineCapacity",
+    "enginePower",
+    "engineType",
+    "transmissionType",
+    "wheelDrive",
+    "steering",
+    "color"
+]
+
+date_columns = [
+    "date"
+]
+
+condition_columns = [
+    "byOrder",
+    "fromOwner",
+    "isNew",
+    "noMileageInRussia",
+    "broken",
+    "noDocs",
+    "passportIssues",
+    "ownedByCompany",
+    "hasPenalties"
+]
+
+fact_columns = [
+    "timeReceived",
+    "bullId",
+    "bullHash",
+    "mileage",
+    "priceRub",
+    "location",
+    "numOfOwners",
+    "numOfPreviousBulls",
+    "carKey",
+    "dateKey",
+    "conditionKey"
+]
 
 def main():
     spark = create_session()
@@ -69,12 +125,55 @@ def main():
     df = df.select(
         from_json(col("json"), json_schema).alias("data")
         ).select("data.*")
+    
+    df_dwh = df.withColumn('timeReceived', date_trunc('minute', 'timeReceived'))\
+    .withColumn('bullId', regexp_extract("bullUrl", r'[0-9]{9}', 0))\
+    .withColumn("bullHash", xxhash64("enginePower", "engineCapacity", "mileage", "priceRub", "numOfOwners"))\
+    .withColumn('carKey', xxhash64(*car_columns))\
+    .withColumn("dateKey", xxhash64(*date_columns))\
+    .withColumn("conditionKey", xxhash64(*condition_columns))
 
-    df.writeStream.format('console') \
+    dim_car = df_dwh.select(*car_columns).drop_duplicates()\
+    .withColumn("carKey", xxhash64(*car_columns))\
+    .select("*")
+
+    dim_date = df_dwh.select(*date_columns).drop_duplicates()\
+    .withColumn("dateKey", xxhash64(*date_columns))\
+    .withColumn("dayOfWeek", weekday("date"))\
+    .withColumn("isWeekend", weekday("date").isin([5, 6]))\
+    .withColumn("month", month("date"))\
+    .withColumn("year", year("date"))\
+    .select("*")
+
+    dim_condition = df_dwh.select(*condition_columns).drop_duplicates()\
+    .withColumn("conditionKey", xxhash64(*condition_columns))\
+    .select("*")
+
+    fact_table = df_dwh.select(*fact_columns)\
+    .select("*")
+    
+    
+    fact_table.writeStream.format('console') \
         .outputMode('append')\
         .option("truncate", False)\
         .start()\
-        .awaitTermination()
+    
+    dim_condition.writeStream.format('console') \
+        .outputMode('append')\
+        .option("truncate", False)\
+        .start()\
+    
+    dim_date.writeStream.format('console') \
+        .outputMode('append')\
+        .option("truncate", False)\
+        .start()\
+    
+    dim_car.writeStream.format('console') \
+        .outputMode('append')\
+        .option("truncate", False)\
+        .start()\
+        
+    spark.streams.awaitAnyTermination()
     
 if __name__ == "__main__":
     main()
