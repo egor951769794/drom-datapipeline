@@ -114,14 +114,14 @@ services:
     ports:
       - 7077:7077
     profiles: ['spark']
+    volumes:
+      - spark-checkpoints:/checkpoints
 
 
 
   datalake-consumer:
     build: minio-datalake/
     profiles: ['datalake']
-    # volumes:
-    #   - /minio-datalake/kafka-consumer:/kafka-consumer
 
 
   MINIO-DATALAKE:
@@ -160,3 +160,4 @@ volumes:
   kafka2:
   kafka3:
   minio-volume:
+  spark-checkpoints:

@@ -3,7 +3,7 @@ import json
 
 from pyspark.sql import SparkSession
 from pyspark.sql.types import StructType, StructField, StringType, IntegerType, TimestampType, ArrayType, ShortType, BooleanType, FloatType
-from pyspark.sql.functions import from_json, col, expr, date_trunc, xxhash64, weekday, year, month, regexp_extract
+from pyspark.sql.functions import from_json, col, date_trunc, xxhash64, weekday, year, month, regexp_extract, to_json, struct
 from constants import KAFKA_BROKERS
 
 
@@ -15,24 +15,16 @@ packages = [
     f'org.apache.spark:spark-streaming-kafka-0-10_{scala_version}:{spark_version}'
 ]
 
-def create_session():
+def create_session() -> SparkSession:
     spark = SparkSession.builder\
-        .master('local[*]')\
+        .master('local[2]')\
         .appName('DWH Star Schema creator')\
         .config('spark.jars.packages', ",".join(packages))\
         .getOrCreate()
     
     return spark
 
-def json_dump(value):
-    return json.dumps(
-        value,
-        ensure_ascii=False,
-        indent=None
-    )
 
-def create_hash(value):
-    return md5(json_dump(value).encode('utf-8')).digest()[:8]
 
 json_schema = StructType([
     StructField("timeReceived", StringType()),
@@ -118,7 +110,7 @@ def main():
         .format('kafka')\
         .option('kafka.bootstrap.servers', KAFKA_BROKERS)\
         .option('subscribe', 'drom.bulletin.posted')\
-        .option("startingOffsets", "earliest")\
+        .option("startingOffsets", "latest")\
         .load()\
         .selectExpr("CAST(value AS STRING) AS json")
     
@@ -135,7 +127,6 @@ def main():
 
     dim_car = df_dwh.select(*car_columns).drop_duplicates()\
     .withColumn("carKey", xxhash64(*car_columns))\
-    .select("*")
 
     dim_date = df_dwh.select(*date_columns).drop_duplicates()\
     .withColumn("dateKey", xxhash64(*date_columns))\
@@ -143,38 +134,62 @@ def main():
     .withColumn("isWeekend", weekday("date").isin([5, 6]))\
     .withColumn("month", month("date"))\
     .withColumn("year", year("date"))\
-    .select("*")
 
     dim_condition = df_dwh.select(*condition_columns).drop_duplicates()\
     .withColumn("conditionKey", xxhash64(*condition_columns))\
-    .select("*")
 
-    fact_table = df_dwh.select(*fact_columns)\
-    .select("*")
-    
-    
-    fact_table.writeStream.format('console') \
-        .outputMode('append')\
-        .option("truncate", False)\
-        .start()\
-    
-    dim_condition.writeStream.format('console') \
-        .outputMode('append')\
-        .option("truncate", False)\
-        .start()\
-    
-    dim_date.writeStream.format('console') \
-        .outputMode('append')\
-        .option("truncate", False)\
-        .start()\
-    
-    dim_car.writeStream.format('console') \
-        .outputMode('append')\
-        .option("truncate", False)\
-        .start()\
+    fact_table = df_dwh.select(*fact_columns)
+
+    fact_table.select(
+        to_json(
+            struct(*fact_table.columns)
+        ).alias("value")
+    ).writeStream\
+    .trigger(processingTime='5 seconds')\
+    .format("kafka")\
+    .option("kafka.bootstrap.servers", KAFKA_BROKERS)\
+    .option("topic", "dwh.table.facts")\
+    .option("checkpointLocation", "/checkpoints/fact-checkpoints")\
+    .outputMode("append")\
+    .start()
+
+    dim_condition.select(
+        to_json(
+            struct(*dim_condition.columns)
+        ).alias("value")
+    ).writeStream\
+    .format("kafka")\
+    .option("kafka.bootstrap.servers", KAFKA_BROKERS)\
+    .option("topic", "dwh.table.condition")\
+    .option("checkpointLocation", "/checkpoints/condition-checkpoints")\
+    .outputMode("append")\
+    .start()
+
+    dim_date.select(
+        to_json(
+            struct(*dim_date.columns)
+        ).alias("value")
+    ).writeStream\
+    .format("kafka")\
+    .option("kafka.bootstrap.servers", KAFKA_BROKERS)\
+    .option("topic", "dwh.table.date")\
+    .option("checkpointLocation", "/checkpoints/date-checkpoints")\
+    .outputMode("append")\
+    .start()
+
+    dim_car.select(
+        to_json(
+            struct(*dim_car.columns)
+        ).alias("value")
+    ).writeStream\
+    .format("kafka")\
+    .option("kafka.bootstrap.servers", KAFKA_BROKERS)\
+    .option("topic", "dwh.table.car")\
+    .option("checkpointLocation", "/checkpoints/car-checkpoints")\
+    .outputMode("append")\
+    .start()
         
     spark.streams.awaitAnyTermination()
     
 if __name__ == "__main__":
     main()
-
