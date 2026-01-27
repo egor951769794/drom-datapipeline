@@ -19,6 +19,7 @@ def create_session() -> SparkSession:
     spark = SparkSession.builder\
         .master('local[2]')\
         .appName('DWH Star Schema creator')\
+        .config("spark.sql.shuffle.partitions", "5")\
         .config('spark.jars.packages', ",".join(packages))\
         .getOrCreate()
     
@@ -39,7 +40,7 @@ json_schema = StructType([
     StructField("engineType", StringType()),
     StructField("transmissionType", StringType()),
     StructField("wheelDrive", StringType()),
-    StructField("mileage", StringType()),
+    StructField("mileage", IntegerType()),
     StructField("isNew", BooleanType()),
     StructField("byOrder", BooleanType()),
     StructField("noMileageInRussia", BooleanType()),
@@ -118,22 +119,26 @@ def main():
         from_json(col("json"), json_schema).alias("data")
         ).select("data.*")
     
-    df_dwh = df.withColumn('timeReceived', date_trunc('minute', 'timeReceived'))\
-    .withColumn('bullId', regexp_extract("bullUrl", r'[0-9]{9}', 0))\
-    .withColumn("bullHash", xxhash64("enginePower", "engineCapacity", "mileage", "priceRub", "numOfOwners"))\
-    .withColumn('carKey', xxhash64(*car_columns))\
-    .withColumn("dateKey", xxhash64(*date_columns))\
-    .withColumn("conditionKey", xxhash64(*condition_columns))
+    df_dwh = df.select(
+        *df.columns,
+        regexp_extract("bullUrl", r'[0-9]{9}', 0).alias("bullId"),
+        xxhash64("enginePower", "engineCapacity", "mileage", "priceRub", "numOfOwners").alias("bullHash"),
+        xxhash64(*car_columns).alias("carKey"),
+        xxhash64(*date_columns).alias("dateKey"),
+        xxhash64(*condition_columns).alias("conditionKey")
+    )
 
-    dim_car = df_dwh.select(*car_columns).drop_duplicates()\
-    .withColumn("carKey", xxhash64(*car_columns))\
-
+    dim_car = df_dwh.select(*car_columns,xxhash64(*car_columns).alias("carKey")).drop_duplicates()\
+    
     dim_date = df_dwh.select(*date_columns).drop_duplicates()\
-    .withColumn("dateKey", xxhash64(*date_columns))\
-    .withColumn("dayOfWeek", weekday("date"))\
-    .withColumn("isWeekend", weekday("date").isin([5, 6]))\
-    .withColumn("month", month("date"))\
-    .withColumn("year", year("date"))\
+    .select(
+        *date_columns,
+        xxhash64(*date_columns).alias("dateKey"),
+        weekday("date").alias("dayOfWeek"),
+        weekday("date").isin([5, 6]).alias("isWeekend"),
+        month("date").alias("month"),
+        year("date").alias("year")
+    )
 
     dim_condition = df_dwh.select(*condition_columns).drop_duplicates()\
     .withColumn("conditionKey", xxhash64(*condition_columns))\
@@ -158,6 +163,7 @@ def main():
             struct(*dim_condition.columns)
         ).alias("value")
     ).writeStream\
+    .trigger(processingTime='5 seconds')\
     .format("kafka")\
     .option("kafka.bootstrap.servers", KAFKA_BROKERS)\
     .option("topic", "dwh.table.condition")\
@@ -170,6 +176,7 @@ def main():
             struct(*dim_date.columns)
         ).alias("value")
     ).writeStream\
+    .trigger(processingTime='5 seconds')\
     .format("kafka")\
     .option("kafka.bootstrap.servers", KAFKA_BROKERS)\
     .option("topic", "dwh.table.date")\
@@ -182,6 +189,7 @@ def main():
             struct(*dim_car.columns)
         ).alias("value")
     ).writeStream\
+    .trigger(processingTime='5 seconds')\
     .format("kafka")\
     .option("kafka.bootstrap.servers", KAFKA_BROKERS)\
     .option("topic", "dwh.table.car")\
