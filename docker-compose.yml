@@ -119,6 +119,8 @@ services:
 
   datalake-consumer:
     build: minio-datalake/
+    depends_on:
+      - MINIO-DATALAKE
     profiles: ['datalake']
 
 
@@ -194,6 +196,12 @@ services:
       PGADMIN_DEFAULT_EMAIL: user@postgres.com
       PGADMIN_DEFAULT_PASSWORD: pwd
     profiles: ['datawarehouse', 'dwh-gui']
+
+  datawarehouse-consumer:
+    build: postgres-datawarehouse/
+    depends_on:
+      - postgres
+    profiles: ['datawarehouse']
 
 volumes:
   kafka1:

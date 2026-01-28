@@ -25,8 +25,6 @@ def create_session() -> SparkSession:
     
     return spark
 
-
-
 json_schema = StructType([
     StructField("timeReceived", StringType()),
     StructField("bullUrl", StringType()),
@@ -128,7 +126,7 @@ def main():
         xxhash64(*condition_columns).alias("conditionKey")
     )
 
-    dim_car = df_dwh.select(*car_columns,xxhash64(*car_columns).alias("carKey")).drop_duplicates()\
+    dim_car = df_dwh.select(*car_columns, xxhash64(*car_columns).alias("carKey")).drop_duplicates()
     
     dim_date = df_dwh.select(*date_columns).drop_duplicates()\
     .select(
@@ -141,9 +139,11 @@ def main():
     )
 
     dim_condition = df_dwh.select(*condition_columns).drop_duplicates()\
-    .withColumn("conditionKey", xxhash64(*condition_columns))\
+    .withColumn("conditionKey", xxhash64(*condition_columns))
 
+    # fact_table = df_dwh.select(xxhash64(df.columns).alias("eventId"), *fact_columns)
     fact_table = df_dwh.select(*fact_columns)
+
 
     fact_table.select(
         to_json(

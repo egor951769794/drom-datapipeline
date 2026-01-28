@@ -53,15 +53,16 @@ class ThreadKafkaConsumer:
                     continue
 
                 for partition, messages in messages_batch.items():
-                    offsets = {}
+                    offset = None
                     for message in messages:
                         try:
                             self.process_message(message, self.session)
-                            offsets[partition] = message.offset + 1
+                            offset = message.offset + 1
 
                         except Exception as e:
                             if shutdown_event.is_set():
-                                self.consumer.commit(offsets)
+                                if offset:
+                                    self.consumer.commit({partition: offset})
                                 self.close()
                                 return
                             
