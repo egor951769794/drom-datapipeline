@@ -72,6 +72,7 @@
 2. **Запустить источник данных**
 	```bash
 	   .venv\Scripts\activate
+	   pip install -r requirements.txt
 	   python ./data-extraction/main.py
 
 3. **Веб-интерфейсы**
