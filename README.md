@@ -5,6 +5,7 @@
 
 **ETL & ELT** процессы, включающие парсинг, обработку и хранение данных об объявлениях о продаже авто на [drom.ru](https://auto.drom.ru) в виде звёздной схемы в DWH PostgreSQL, а также в сыром виде в MinIO Datalake.  
 Сквозной пайплайн: сырые данные -> аналитические таблицы в PostgreSQL с использованием Kafka и Spark Streaming.
+---
 ![Project structure](readme_images/structure.png)
 
 ---
