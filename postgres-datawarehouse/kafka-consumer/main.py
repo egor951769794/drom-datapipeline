@@ -5,7 +5,7 @@ import signal
 import psycopg2
 import json
 
-from kafka import KafkaConsumer
+from kafka import KafkaConsumer, OffsetAndMetadata
 from kafka.errors import NoBrokersAvailable
 
 from psycopg2.extras import execute_batch
@@ -63,13 +63,16 @@ class ThreadKafkaConsumer:
                     continue
                 
                 for partition, messages in messages_batch.items():
+                    leader_epoch = self.consumer._subscription.all_consumed_offsets()[partition].leader_epoch
                     for message in messages:
                         try:
                             record = message.value
                             bulk.append(
                                 [record.get(key) for key in TOPIC_TABLE_SCHEMA[self.topic]]
                             )
-                            offsets[partition] = message.offset + 1
+                            offsets[partition] = OffsetAndMetadata(offset=message.offset + 1, metadata='', leader_epoch=leader_epoch)
+                            print(record)
+                            print("leader_epoch = ", leader_epoch)
 
                         except Exception as e:
                             if shutdown_event.is_set():
@@ -93,11 +96,11 @@ class ThreadKafkaConsumer:
 
             except Exception as e:
                 print(f"Error while reading batch from kafka topic {self.topic}: {e}")
-                print(repr(e))
                 sleep(1)
 
-        self.conn.commit()
-        self.conn.close()
+        if not self.conn.closed:
+            self.conn.commit()
+            self.conn.close()
         self.consumer.commit()
         self.close()
 
@@ -222,18 +225,17 @@ def main():
     conn, cur = connect_to_db()
 
     try:
-        bulletin_consumer = ThreadKafkaConsumer(
+        facts_consumer = ThreadKafkaConsumer(
             topic=TOPIC_FACTS,
             group_id="facts_csg1",
             bootstrap_servers=CONSUMER_BOOTSTRAP_SERVERS,
             cur=cur,
             conn=conn,
             max_poll=10000,
-            bulk_size=1
+            bulk_size=2
         )
-        bulletin_consumer.start()
 
-        bulletin_consumer = ThreadKafkaConsumer(
+        car_consumer = ThreadKafkaConsumer(
             topic=TOPIC_CAR,
             group_id="car_csg1",
             bootstrap_servers=CONSUMER_BOOTSTRAP_SERVERS,
@@ -242,9 +244,8 @@ def main():
             max_poll=10000,
             bulk_size=1
         )
-        bulletin_consumer.start()
 
-        bulletin_consumer = ThreadKafkaConsumer(
+        date_consumer = ThreadKafkaConsumer(
             topic=TOPIC_DATE,
             group_id="date_csg1",
             bootstrap_servers=CONSUMER_BOOTSTRAP_SERVERS,
@@ -253,9 +254,8 @@ def main():
             max_poll=10000,
             bulk_size=1
         )
-        bulletin_consumer.start()
 
-        bulletin_consumer = ThreadKafkaConsumer(
+        condition_consumer = ThreadKafkaConsumer(
             topic=TOPIC_CONDITION,
             group_id="condition_csg1",
             bootstrap_servers=CONSUMER_BOOTSTRAP_SERVERS,
@@ -264,7 +264,10 @@ def main():
             max_poll=10000,
             bulk_size=1
         )
-        bulletin_consumer.start()
+        facts_consumer.start()
+        condition_consumer.start()
+        date_consumer.start()
+        car_consumer.start()
 
         while not shutdown_event.is_set():
             sleep(1)
@@ -273,7 +276,10 @@ def main():
         print(f"Error while executing Kafka Consumer occured: {e}")
         shutdown_event.set()
     finally:
-        bulletin_consumer.join()
+        facts_consumer.join()
+        car_consumer.join()
+        date_consumer.join()
+        condition_consumer.join()
         print(f"Consumers are successfuly terminated. Exiting")
 
 

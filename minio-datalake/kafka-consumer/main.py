@@ -5,7 +5,7 @@ import threading
 import signal
 
 import boto3
-from kafka import KafkaConsumer
+from kafka import KafkaConsumer, OffsetAndMetadata
 from kafka.errors import NoBrokersAvailable
 
 from constants import CONSUMER_BOOTSTRAP_SERVERS
@@ -53,6 +53,7 @@ class ThreadKafkaConsumer:
                     continue
 
                 for partition, messages in messages_batch.items():
+                    leader_epoch = self.consumer._subscription.all_consumed_offsets()[partition].leader_epoch
                     offset = None
                     for message in messages:
                         try:
@@ -62,7 +63,7 @@ class ThreadKafkaConsumer:
                         except Exception as e:
                             if shutdown_event.is_set():
                                 if offset:
-                                    self.consumer.commit({partition: offset})
+                                    self.consumer.commit({partition: OffsetAndMetadata(offset=offset, metadata='', leader_epoch=leader_epoch)})
                                 self.close()
                                 return
                             
@@ -162,6 +163,7 @@ def main():
         shutdown_event.set()
     finally:
         bulletin_consumer.join()
+        pictures_consumer.join()
         print(f"Consumers are successfuly terminated. Exiting")
 
 

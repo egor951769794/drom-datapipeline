@@ -133,7 +133,7 @@ def main():
         *date_columns,
         xxhash64(*date_columns).alias("dateKey"),
         weekday("date").alias("dayOfWeek"),
-        weekday("date").isin([5, 6]).alias("isWeekend"),
+        weekday("date").isin([6, 7]).alias("isWeekend"),
         month("date").alias("month"),
         year("date").alias("year")
     )
