@@ -5,8 +5,8 @@
 
 **ETL & ELT** процессы, включающие парсинг, обработку и хранение данных об объявлениях о продаже авто на [drom.ru](https://auto.drom.ru) в виде звёздной схемы в DWH PostgreSQL, а также в сыром виде в MinIO Datalake.  
 Сквозной пайплайн: сырые данные -> аналитические таблицы в PostgreSQL с использованием Kafka и Spark Streaming.
-![Project structure](<img width="1582" height="1027" alt="structure" src="https://github.com/user-attachments/assets/246e5dc0-abad-401d-9116-6ec09f7c7878" />
-)
+---
+![Project structure](readme_images/structure.png)
 
 ---
 
@@ -38,8 +38,7 @@
 
 ## Структура данных DWH
 
-![Data Warehouse Structure](<img width="1417" height="924" alt="dwh_tables" src="https://github.com/user-attachments/assets/88c873b3-d6fe-4986-ab59-be44010fff85" />
-)
+![Data Warehouse Structure](readme_images/dwh_tables.png)
 
 ### Таблица фактов
 - `bulls fact`
@@ -73,6 +72,7 @@
 2. **Запустить источник данных**
 	```bash
 	   .venv\Scripts\activate
+	   pip install -r requirements.txt
 	   python ./data-extraction/main.py
 
 3. **Веб-интерфейсы**
