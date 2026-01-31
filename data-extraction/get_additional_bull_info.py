@@ -4,9 +4,16 @@ from misc.get_request import get_request
 from misc.sleep import sleep
 
 
-def get_additional_bull_info(url):
+def get_additional_bull_info(url, attempt=0):
     
     r = get_request(url)
+
+    if not r:
+        if attempt < 10:
+            sleep(5, 2)
+            return get_additional_bull_info(url, attempt=attempt+1)
+        else:
+            return [None] * 9
 
     color = steering = passportIssues = company = penalties = owners = prevBulls = date = additionalPhotos = None
 

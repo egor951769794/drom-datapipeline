@@ -7,9 +7,17 @@ from misc.constants import DROM_BASE_URL, REGIONS
 def get_first_unpromoted_page(region):
     promoted = True
     page_num = 1
+
     while promoted:
-        r = get_request(DROM_BASE_URL + '/' + REGIONS[region] + 'all/page' + str(page_num))
+
+        r = get_request(DROM_BASE_URL + '/' + REGIONS[region] + 'all/page' + str(page_num), find_tag=["div", {"data-bulletin-list": "true"}])
+
+        if not r:
+            sleep(10, 3)
+            continue
+        
         all_bulls = bs4(r.text, "html.parser").find("div", {"data-bulletin-list": "true"})
+
         if len(all_bulls.find_all("div", {"data-ftid": "bull_promotion_3"})) < 20:
             promoted = False
         else:

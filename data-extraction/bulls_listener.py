@@ -38,7 +38,11 @@ def bulls_listener(region=None, page=None):
         print("[" + str(datetime.now()) + "] ", "Drom bulletins listener created. Press Ctrl+C for exit\n\n")
 
         while True:
-            r = get_request(url)
+            r = get_request(url, find_tag=["div", {"data-bulletin-list": "true"}])
+            
+            if not r:
+                sleep(10, 3)
+                continue
 
             all_bulls = bs4(r.text, "html.parser").find("div", {"data-bulletin-list": "true"}) 
             if len(all_bulls.find_all("div", {"data-ftid": "bull_promotion_3"})) in [20, 0]:

@@ -83,12 +83,12 @@ def create_bull_json(bull):
     car['noDocs'] = len(bull.find_all("div", {"data-ftid": "bull_label_nodocs"})) > 0
 
     sleep(4, 0.7)
-
+    
     car['color'], car['steering'], car['passportIssues'], car['ownedByCompany'], car['hasPenalties'],\
-    car['numOfOwners'], car['numOfPreviousBulls'], car['date'], additionalPhotos = get_additional_bull_info(car['bullUrl'])
+    car['numOfOwners'], car['numOfPreviousBulls'], car['date'], additional_photos = get_additional_bull_info(car['bullUrl'])
 
-    if additionalPhotos:
-        car['imageUrls'] = additionalPhotos
+    if additional_photos:
+        car['imageUrls'] = additional_photos
 
     image_ids = [generate_image_id(url) for url in car['imageUrls']]
     image_bytes = encode_images(car['imageUrls'])
