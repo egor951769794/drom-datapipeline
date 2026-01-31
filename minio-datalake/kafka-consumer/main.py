@@ -3,13 +3,13 @@ from time import sleep
 from hashlib import md5
 import threading
 import signal
+import json
 
 import boto3
 from kafka import KafkaConsumer, OffsetAndMetadata
 from kafka.errors import NoBrokersAvailable
 
-from constants import CONSUMER_BOOTSTRAP_SERVERS
-from constants import BUCKET_BULLETINS, BUCKET_BULLETINPICS
+from constants import BUCKET_BULLETINS, BUCKET_BULLETINPICS, CONSUMER_BOOTSTRAP_SERVERS, BULLETIN_HASH_FIELDS
 
 
 shutdown_event = threading.Event()
@@ -90,7 +90,7 @@ class ThreadKafkaConsumer:
             self.thread.join(timeout)
 
     def process_message(self, msg, session):
-        print(msg.value.decode('utf-8') if msg.value else "No value provided in message received") 
+        print(msg.value.decode('utf-8') if msg.value else "No value provided in message received")
 
 
 def handle_signal(signum, frame):
@@ -103,7 +103,8 @@ class BulletinKafkaConsumer(ThreadKafkaConsumer):
         super().__init__(topic, group_id, bootstrap_servers, session, max_poll)
 
     def process_message(self, msg, session):
-        session.upload_fileobj(BytesIO(msg.value), BUCKET_BULLETINS, 'bulletin_' + md5(msg.value).hexdigest()[:8] + '.json')
+        hash_fields = "|".join([json.loads(msg.value.decode('utf-8')).get(key) for key in BULLETIN_HASH_FIELDS]).encode('utf-8')
+        session.upload_fileobj(BytesIO(msg.value), BUCKET_BULLETINS, 'bulletin_' + md5(hash_fields).hexdigest()[:8] + '.json')
 
 
 class BulletinPicsKafkaConsumer(ThreadKafkaConsumer):
