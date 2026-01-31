@@ -187,6 +187,7 @@ def init_db():
     cur.execute("""
     CREATE TABLE IF NOT EXISTS dim_date (
         date_key BIGINT PRIMARY KEY,
+        date DATE,
         day_of_week SMALLINT,
         is_weekend BOOLEAN,
         month SMALLINT,

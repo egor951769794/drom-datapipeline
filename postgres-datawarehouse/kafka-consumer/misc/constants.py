@@ -53,6 +53,7 @@ TOPIC_TABLE_SCHEMA = {
     ],
     TOPIC_DATE: [
         "dateKey",
+        "date",
         "dayOfWeek",
         "isWeekend",
         "month",
@@ -111,11 +112,12 @@ DB_INSERT_QUERIES = {
     TOPIC_DATE: """
         INSERT INTO dim_date (
             date_key,
+            date,
             day_of_week,
             is_weekend,
             month,
             year
-        ) VALUES (%s, %s, %s, %s, %s)
+        ) VALUES (%s, %s, %s, %s, %s, %s)
         ON CONFLICT (date_key) DO NOTHING;
     """
 }
