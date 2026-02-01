@@ -11,7 +11,7 @@ def get_request(url, second_try=False, find_tag=None):
         response = requests.get(url, headers = {'User-agent': REQUEST_USER_AGENT})
         if find_tag and bs4(response.text, "html.parser").find(find_tag[0], find_tag[1]):
             return response
-        elif bs4(response.text, "html.parser").find() is not None:
+        elif "text/html" not in response.headers.get('content-type') or bs4(response.text, "html.parser").find() is not None:
             return response
         else:
             return None

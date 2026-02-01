@@ -97,6 +97,10 @@ services:
     command: |
       "
       echo -e 'Initializing kafka cluster topics...'
+      while [ $(/opt/kafka/bin/kafka-broker-api-versions.sh --bootstrap-server kafka-1:9091 | wc -l) -lt 3 ]; do
+        sleep 3;
+      done;
+      echo -e 'All kafka brokers are available. Creating topics...'
       /opt/kafka/bin/kafka-topics.sh --bootstrap-server kafka-1:9091 --create --if-not-exists --topic drom.bulletin.posted --replication-factor 3 --partitions 3
       /opt/kafka/bin/kafka-topics.sh --bootstrap-server kafka-1:9091 --create --if-not-exists --topic drom.bulletin.pictures --replication-factor 3 --partitions 3
       /opt/kafka/bin/kafka-topics.sh --bootstrap-server kafka-1:9091 --create --if-not-exists --topic dwh.table.facts --replication-factor 3 --partitions 3
