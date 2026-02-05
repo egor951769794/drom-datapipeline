@@ -71,8 +71,6 @@ class ThreadKafkaConsumer:
                                 [record.get(key) for key in TOPIC_TABLE_SCHEMA[self.topic]]
                             )
                             offsets[partition] = OffsetAndMetadata(offset=message.offset + 1, metadata='', leader_epoch=leader_epoch)
-                            print(record)
-                            print("leader_epoch = ", leader_epoch)
 
                         except Exception as e:
                             if shutdown_event.is_set():
@@ -113,9 +111,6 @@ class ThreadKafkaConsumer:
     def join(self, timeout=5):
         if self.thread and self.thread.is_alive():
             self.thread.join(timeout)
-
-    def process_message(self, msg, session):
-        print(msg.value.decode('utf-8') if msg.value else "No value provided in message received") 
 
 
 def handle_signal(signum, frame):

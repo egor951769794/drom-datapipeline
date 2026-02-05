@@ -1,9 +1,8 @@
 from hashlib import md5
-import json
 
 from pyspark.sql import SparkSession
 from pyspark.sql.types import StructType, StructField, StringType, IntegerType, TimestampType, ArrayType, ShortType, BooleanType, FloatType
-from pyspark.sql.functions import from_json, col, date_trunc, xxhash64, weekday, year, month, regexp_extract, to_json, struct
+from pyspark.sql.functions import from_json, col, xxhash64, weekday, year, month, regexp_extract, to_json, struct
 from constants import KAFKA_BROKERS
 
 
@@ -140,8 +139,6 @@ def main():
 
     dim_condition = df_dwh.select(*condition_columns).drop_duplicates()\
     .withColumn("conditionKey", xxhash64(*condition_columns))
-
-    # fact_table = df_dwh.select(xxhash64(df.columns).alias("eventId"), *fact_columns)
     fact_table = df_dwh.select(*fact_columns)
 
 

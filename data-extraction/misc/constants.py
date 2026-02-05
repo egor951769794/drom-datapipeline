@@ -1,6 +1,6 @@
 REQUEST_USER_AGENT = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36 Edg/143.0.0.0'
 
-DROM_BASE_URL = "https://auto.drom.ru"
+DROM_BASE_URL = "https://auto.drom.ru/"
 
 REGIONS = {
     None: '',
@@ -37,3 +37,8 @@ MANUFACTURERS = [
 ]
 
 PRODUCER_BOOTSTRAP_SERVERS = ['localhost:9092', 'localhost:9082', 'localhost:9072']
+
+TAG_CHECKS = {
+    'bulletins_list': ["div", {"data-bulletin-list": "true"}],
+    'bulletin': ["h1", {"data-ftid": "page-title"}]
+}
