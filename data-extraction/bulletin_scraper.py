@@ -37,16 +37,18 @@ class BulletinScraper:
 
         bulls_list = self.parser.parse_page(page)
 
-        bulls_list_filtered = list(filter(self.parser.filter_bulletin, bulls_list))
+        bulls_list_not_parsed = list(filter(self.parser._filter_parsed_bulletin, bulls_list))
+        bulls_list_not_promoted = list(filter(self.parser._filter_promoted_bulletin, bulls_list))
+
+        bulls_list_filtered = list(set(bulls_list_not_parsed) & set(bulls_list_not_promoted))
+
 
         self.log(f"Got {len(bulls_list_filtered)} new bulletins from page №{self.parser.page}")
 
-        n_bulletins = len(bulls_list_filtered)
-
         if not self.parser.page_check_iter_countdown:
 
-            if not n_bulletins:
-                self.log("Checking for new optimal page")
+            if not len(bulls_list_not_promoted):
+                self.log("Checking if first unpromoted page changed")
 
                 _url = self.parser.create_url(self.parser.page + 1)
                 _res = self.get_page(_url)
@@ -54,8 +56,8 @@ class BulletinScraper:
                 self.parser.check_page(page=_res, dir='next')
 
 
-            elif n_bulletins == 20:
-                self.log("Checking for new optimal page")
+            elif len(bulls_list_not_promoted) == 20:
+                self.log("Checking if first unpromoted page changed")
 
                 _url = self.parser.create_url(self.parser.page - 1)
                 _res = self.get_page(_url)
@@ -99,13 +101,13 @@ class BulletinScraper:
     def start(self, page_n=None):
         self.producer = self.create_producer()
 
-        if not page_n or not self.parser.check_page(self.get_page(self.parser.create_url(page_n))):
+        if not page_n or not self.parser.check_unpromoted_page(page=self.get_page(self.parser.create_url(page_n)), page_n=page_n):
             self.log("Looking for starting page...")
             for i in range(8, 20):
 
                 res = self.get_page(self.parser.create_url(i+1))
 
-                if self.parser.check_page(page=res, page_n=i+1):
+                if self.parser.check_unpromoted_page(page=res, page_n=i+1):
                     break
 
             if not self.parser.page:

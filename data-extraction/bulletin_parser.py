@@ -72,34 +72,45 @@ class BulletinParser:
 
     def filter_bulletin(self, bull):
         return self._filter_parsed_bulletin(bull) and self._filter_promoted_bulletin(bull)
-
-    def check_page(self, page, dir=None, page_n=None):
-
+    
+    def check_unpromoted_page(self, page, page_n):
         if page_n:
-            self.log(f"Checking page № {page_n}")
+            self.log(f"Checking if page №{page_n} contains unpromoted bulletins")
 
         bulls_list = self.parse_page(page)
-        bulls_list_filtered = list(filter(self.filter_bulletin, bulls_list))
+        bulls_list_filtered = list(filter(self._filter_promoted_bulletin, bulls_list))
 
         if len(bulls_list_filtered):
             self.page_check_iter_countdown = 3
 
             self.current_page = page
 
-            if dir == 'next':
-                self.page += 1
-
-            elif dir == 'prev':
-                self.page -= 1
-            
-            else:
-                self.page = page_n
+            self.page = page_n
             
             self.log(f"Setting page №{self.page} for listening")
-            self.current_page = page
             return True
         
         return False
+
+
+    def check_page(self, page, dir=None):
+
+        bulls_list = self.parse_page(page)
+        bulls_list_unpromoted = list(filter(self._filter_promoted_bulletin, bulls_list))
+
+        if dir == 'next':
+
+            self.page += 1
+            self.log(f"Setting page №{self.page} for listening")
+            self.current_page = page
+
+        elif dir =='prev' and len(bulls_list_unpromoted):
+            self.page_check_iter_countdown = 3
+
+            self.page -= 1
+            self.log(f"Setting page №{self.page} for listening")
+            self.current_page = page
+
     
     def encode_images(self, image_url_list):
         encoded_images = []
