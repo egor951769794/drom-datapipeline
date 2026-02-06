@@ -10,10 +10,11 @@ from misc.sleep import sleep
 from request_module import RequestModule
 
 class BulletinScraper:
-    def __init__(self, parser, verbose=True):
+    def __init__(self, parser, verbose=True, mode = 'live'):
         self.parser = parser
         self.session_cache = None
         self.verbose = verbose
+        self.collect_historical = mode == 'historical'
         self.request = RequestModule(verbose=verbose)
     
     def log(self, msg, output_mode='console', log_path=None):
@@ -45,6 +46,20 @@ class BulletinScraper:
 
         self.log(f"Got {len(bulls_list_filtered)} new bulletins from page №{self.parser.page}")
 
+        for bull in bulls_list_filtered:
+            self.process_bulletin(bull)
+            sleep(10, 2)
+
+        if self.collect_historical:
+            _url = self.parser.create_url(self.parser.page + 1)
+            _res = self.get_page(_url)
+
+            if not self.parser.go_next_page(page=_res, page_n = self.parser.page + 1):
+                self.system_log(f"Page №{self.parser.page + 1} has no new bulletins. Quitting...")
+                sys.exit(0)
+            else:
+                return
+
         if not self.parser.page_check_iter_countdown:
 
             if not len(bulls_list_not_promoted):
@@ -53,7 +68,7 @@ class BulletinScraper:
                 _url = self.parser.create_url(self.parser.page + 1)
                 _res = self.get_page(_url)
 
-                self.parser.check_page(page=_res, dir='next')
+                self.parser.check_unpromoted_page(page=_res, page_n = self.parser.page + 1)
 
 
             elif len(bulls_list_not_promoted) == 20:
@@ -62,12 +77,7 @@ class BulletinScraper:
                 _url = self.parser.create_url(self.parser.page - 1)
                 _res = self.get_page(_url)
 
-                self.parser.check_page(page=_res, dir='prev')
-
-        
-        for bull in bulls_list_filtered:
-            self.process_bulletin(bull)
-            sleep(10, 2)
+                self.parser.check_unpromoted_page(page=_res, page_n = self.parser.page - 1)
 
 
     def process_bulletin(self, bull):
@@ -86,7 +96,7 @@ class BulletinScraper:
             try:
                 sleep(1, 0)
                 producer = KafkaProducer(bootstrap_servers=PRODUCER_BOOTSTRAP_SERVERS, enable_idempotence=True, acks='all')
-                self.system_log("Drom bulletins listener created. Press Ctrl+C for exit")
+                self.system_log("Kafka producer created")
 
                 return producer
             
@@ -99,21 +109,32 @@ class BulletinScraper:
 
 
     def start(self, page_n=None):
+        self.system_log(f"Creating bulletin scraper with {'collect_hisotrical' if self.collect_historical else 'collect_live'} mode")
+
         self.producer = self.create_producer()
 
-        if not page_n or not self.parser.check_unpromoted_page(page=self.get_page(self.parser.create_url(page_n)), page_n=page_n):
-            self.log("Looking for starting page...")
-            for i in range(8, 20):
+        if not self.collect_historical or not page_n:
 
-                res = self.get_page(self.parser.create_url(i+1))
+            if not page_n or not self.parser.check_unpromoted_page(page=self.get_page(self.parser.create_url(page_n)), page_n=page_n)\
+            or (page_n > 1 and self.parser.check_unpromoted_page(page=self.get_page(self.parser.create_url(page_n-1)), page_n=page_n-1)):
+                self.system_log("Starting page number provided is incorrect for live mode data collecting. Looking for starting page...")
+                for i in range(8, 20):
 
-                if self.parser.check_unpromoted_page(page=res, page_n=i+1):
-                    break
+                    res = self.get_page(self.parser.create_url(i+1))
 
-            if not self.parser.page:
-                self.log("Unable to find starting page")
-                sys.exit(1)
-                
+                    if self.parser.check_unpromoted_page(page=res, page_n=i+1):
+                        break
+
+                if not self.parser.page:
+                    self.log("Unable to find starting page")
+                    sys.exit(1)
+
+        else:
+            self.parser.page = page_n
+            self.parser.current_page = self.get_page(self.parser.create_url())
+
+        self.system_log("Bulletins listener created. Press Ctrl+C for exit")
+
         try:
             while True:
                 
