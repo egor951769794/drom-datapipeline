@@ -207,6 +207,52 @@ services:
       - postgres
     profiles: ['datawarehouse']
 
+  redis:
+    image: redis:7
+    container_name: superset_cache
+    restart: unless-stopped
+    volumes:
+      - redis:/data
+    profiles: ['dashboard']
+
+  db:
+    image: postgres:15-alpine
+    container_name: superset_db
+    environment:
+      POSTGRES_DB: superset
+      POSTGRES_USER: superset
+      POSTGRES_PASSWORD: superset_password
+    volumes:
+      - superset_db_data:/var/lib/postgresql/data
+    profiles: ['dashboard']
+
+  superset:
+    build: superset/
+    container_name: superset_app
+    command: >
+      bash -c "
+      superset db upgrade &&
+      superset fab create-admin --username admin --firstname Superset --lastname Admin --email admin@superset.com --password admin &&
+      superset init &&
+      /app/docker/docker-bootstrap.sh app-gunicorn
+      "
+    user: "root"
+    ports:
+      - 8088:8088
+    environment:
+      SUPERSET_SECRET_KEY: "..."
+      DATABASE_DB: superset
+      DATABASE_HOST: db
+      DATABASE_PASSWORD: superset_password
+      DATABASE_USER: superset
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+    depends_on:
+      - db
+      - redis
+    profiles: ['dashboard']
+    
+
 volumes:
   kafka1:
   kafka2:
@@ -214,3 +260,5 @@ volumes:
   minio-volume:
   spark-checkpoints:
   pgdata:
+  redis:
+  superset_db_data:
