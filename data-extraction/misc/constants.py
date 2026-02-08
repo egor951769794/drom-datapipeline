@@ -40,5 +40,12 @@ PRODUCER_BOOTSTRAP_SERVERS = ['localhost:9092', 'localhost:9082', 'localhost:907
 
 TAG_CHECKS = {
     'bulletins_list': ["div", {"data-bulletin-list": "true"}],
-    'bulletin': ["h1", {"data-ftid": "page-title"}]
+    'bulletin': [
+        ["h1", {"data-ftid": "page-title"}],
+        ['tr', {'data-ftid': 'specification-color'}],
+        ['tr', {'data-ftid': 'specification-wheel'}],
+        ['tr', {'data-ftid': 'specification-owners'}],
+        ['div', {"data-ftid": "bull-page_bull-gallery_thumbnails"}],
+        ['div', {'data-ftid': 'bull-page_bull-views'}],
+    ]
 }

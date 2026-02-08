@@ -219,7 +219,7 @@ class BulletinParser:
         color = steering = passportIssues = company = penalties = owners = prevBulls = date = additionalPhotos = None
 
         if r is None:
-                return color, steering, passportIssues, company, penalties, owners, prevBulls, date, additionalPhotos
+            return color, steering, passportIssues, company, penalties, owners, prevBulls, date, additionalPhotos
 
         page = bs4(r.text, "html.parser")
         if page.find('tr', {'data-ftid': 'specification-color'}):
@@ -247,10 +247,13 @@ class BulletinParser:
 
         if page.find('div', {"data-ftid": "bull-page_bull-gallery_thumbnails"}):
             additionalPhotos = [pic.attrs['href'] for pic in page.find('div', {"data-ftid": "bull-page_bull-gallery_thumbnails"}).find_all('a')][:5]
-
-        if re.findall(r'[0-9]{2}.[0-1]{1}[0-9]{1}.20[0-9]{2}', str(page.find('div', {'data-ftid': 'bull-page_bull-views'}).text)):
-            date_ = re.findall(r'[0-9]{2}.[0-1]{1}[0-9]{1}.20[0-9]{2}', str(page.find('div', {'data-ftid': 'bull-page_bull-views'}).text))[0].split(sep='.')
-            date = f'{date_[2]}-{date_[1]}-{date_[0]}'
+       
+        try:
+            if re.findall(r'[0-9]{2}.[0-1]{1}[0-9]{1}.20[0-9]{2}', str(page.find('div', {'data-ftid': 'bull-page_bull-views'}).text)):
+                date_ = re.findall(r'[0-9]{2}.[0-1]{1}[0-9]{1}.20[0-9]{2}', str(page.find('div', {'data-ftid': 'bull-page_bull-views'}).text))[0].split(sep='.')
+                date = f'{date_[2]}-{date_[1]}-{date_[0]}'
+        except AttributeError:
+            date = None
 
         sleep(1, 0.15)
             

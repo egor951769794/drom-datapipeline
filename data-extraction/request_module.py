@@ -8,6 +8,8 @@ from bs4 import BeautifulSoup as bs4
 class RequestModule:
     def __init__(self, verbose):
         self.verbose = verbose
+        self.cached_response = None
+        self.satisfied_conditions = 0
 
     def check_tag(self, msg, tag_name=None, condition=None):
         try:
@@ -29,7 +31,34 @@ class RequestModule:
         try:
             response = requests.get(url, headers = {'User-agent': REQUEST_USER_AGENT})
             sleep(sleep_for, sleep_for / 4)
-            if tag_to_check and self.check_tag(response, tag_to_check[0], tag_to_check[1]):
+
+            if tag_to_check and isinstance(tag_to_check[0], list):
+                if current_try > 1:
+                    self.log("Perform another response to get better quality data")
+
+                cur_satisfied_conditions = 0
+                for tag_condition in tag_to_check:
+                    if self.check_tag(response, tag_condition[0], tag_condition[1]):
+                        cur_satisfied_conditions += 1
+                
+                if cur_satisfied_conditions > self.satisfied_conditions:
+                    self.satisfied_conditions = cur_satisfied_conditions
+                    self.cached_response = response
+                
+                if self.satisfied_conditions == len(tag_to_check):
+                    self.satisfied_conditions = 0
+                    self.cached_response = None
+                    return response
+                
+                elif current_try < max_retries:
+                    return self.get_request(url=url, max_retries=max_retries, current_try=current_try+1, tag_to_check=tag_to_check, sleep_for=sleep_for*1.2)
+                else:
+                    self.satisfied_conditions = 0
+                    self.cached_response = None
+                    return response
+                
+
+            elif tag_to_check and self.check_tag(response, tag_to_check[0], tag_to_check[1]):
                 return response
             
             elif "text/html" not in response.headers.get('content-type') or self.check_tag(response):
