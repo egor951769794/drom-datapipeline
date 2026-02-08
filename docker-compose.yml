@@ -119,14 +119,11 @@ services:
     volumes:
       - spark-checkpoints:/checkpoints
 
-
-
   datalake-consumer:
     build: minio-datalake/
     depends_on:
       - MINIO-DATALAKE
     profiles: ['datalake']
-
 
   MINIO-DATALAKE:
     image: minio/minio:RELEASE.2025-09-07T16-13-09Z-cpuv1
@@ -224,6 +221,8 @@ services:
       POSTGRES_PASSWORD: superset_password
     volumes:
       - superset_db_data:/var/lib/postgresql/data
+      - ./superset/docker-entrypoint-initdb.d:/docker-entrypoint-initdb.d
+      - ./superset/dump_metadata:/dump
     profiles: ['dashboard']
 
   superset:
@@ -259,7 +258,6 @@ services:
       - ./superset/init:/app_/
     profiles: ['dashboard']
     
-
 volumes:
   kafka1:
   kafka2:

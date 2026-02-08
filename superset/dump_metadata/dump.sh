@@ -1,0 +1,3 @@
+#!/bin/bash
+
+pg_dump -U superset -d superset --no-owner --no-privileges --clean --if-exists > /docker-entrypoint-initdb.d/01-superset_dump.sql
