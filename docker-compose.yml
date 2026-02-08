@@ -232,8 +232,12 @@ services:
     command: >
       bash -c "
       superset db upgrade &&
-      superset fab create-admin --username admin --firstname Superset --lastname Admin --email admin@superset.com --password admin &&
-      superset init &&
+      mkdir -p /app_ && 
+      if [ ! -f /app_/.initialized ]; then
+        superset fab create-admin --username admin --firstname Superset --lastname Admin --email admin@superset.com --password admin
+        superset init
+        touch /app_/.initialized
+      fi && 
       /app/docker/docker-bootstrap.sh app-gunicorn
       "
     user: "root"
@@ -245,11 +249,14 @@ services:
       DATABASE_HOST: db
       DATABASE_PASSWORD: superset_password
       DATABASE_USER: superset
+      SUPERSET_CONFIG_PATH: /app/superset_config.py
       REDIS_HOST: redis
       REDIS_PORT: 6379
     depends_on:
       - db
       - redis
+    volumes:
+      - ./superset/init:/app_/
     profiles: ['dashboard']
     
 
