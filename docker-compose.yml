@@ -167,6 +167,8 @@ services:
       PGDATA: /var/lib/postgresql/data/pgdata
     volumes:
       - pgdata:/var/lib/postgresql/data/pgdata
+      - ./postgres-datawarehouse/docker-entrypoint-initdb.d:/docker-entrypoint-initdb.d
+      - ./postgres-datawarehouse/update_db:/update_db
     profiles: ['datawarehouse', 'dwh-db']
     command:
     - "postgres"
@@ -234,6 +236,7 @@ services:
       mkdir -p /app_ && 
       if [ ! -f /app_/.initialized ]; then
         superset fab create-admin --username admin --firstname Superset --lastname Admin --email admin@superset.com --password admin
+        superset fab create-user --username user --role Gamma --firstname Superset --lastname User --email user@superset.com --password user
         superset init
         touch /app_/.initialized
       fi && 
@@ -267,3 +270,5 @@ volumes:
   pgdata:
   redis:
   superset_db_data:
+  pgdata_test:
+  
