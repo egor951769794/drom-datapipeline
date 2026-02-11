@@ -1,17 +1,16 @@
-from hashlib import md5
-
 from pyspark.sql import SparkSession
 from pyspark.sql.types import StructType, StructField, StringType, IntegerType, TimestampType, ArrayType, ShortType, BooleanType, FloatType
-from pyspark.sql.functions import from_json, col, xxhash64, weekday, year, month, regexp_extract, to_json, struct
-from constants import KAFKA_BROKERS
-
+from pyspark.sql.functions import from_json, col, xxhash64, weekday, year, month, regexp_extract, to_json, struct, window, count, avg, to_timestamp
+from constants import KAFKA_BROKERS, JDBC_CONNECTION_STRING, JDBC_CONNECTION_PROPS
 
 scala_version = '2.12'
 spark_version = '3.5.8'
+
 packages = [
     f'org.apache.spark:spark-sql-kafka-0-10_{scala_version}:{spark_version}',
     'org.apache.kafka:kafka-clients:3.2.0',
-    f'org.apache.spark:spark-streaming-kafka-0-10_{scala_version}:{spark_version}'
+    f'org.apache.spark:spark-streaming-kafka-0-10_{scala_version}:{spark_version}',
+    'org.postgresql:postgresql:42.7.9'
 ]
 
 def create_session() -> SparkSession:
@@ -23,6 +22,15 @@ def create_session() -> SparkSession:
         .getOrCreate()
     
     return spark
+
+def write_jdbc(batch, batch_id):
+    batch.write\
+    .mode("append")\
+    .jdbc(
+        url=JDBC_CONNECTION_STRING,
+        table="common_analytics.monitoring",
+        properties=JDBC_CONNECTION_PROPS
+    )
 
 json_schema = StructType([
     StructField("timeReceived", StringType()),
@@ -100,6 +108,14 @@ fact_columns = [
     "conditionKey"
 ]
 
+monitoring_columns = [
+    "window_start",
+    "window_end",
+    "manufacturer",
+    "bulls_count",
+    "avg_price"
+]
+
 def main():
     spark = create_session()
 
@@ -114,7 +130,26 @@ def main():
     
     df = df.select(
         from_json(col("json"), json_schema).alias("data")
-        ).select("data.*")
+        ).select("data.*")\
+        .withColumn("timeReceived", to_timestamp("timeReceived"))
+    
+    df_monitoring = df\
+        .withWatermark("timeReceived", "1 hour")\
+        .groupBy(
+            window(col("timeReceived"), "1 day").alias("time_window"),
+            col("manufacturer")
+        )\
+        .agg(
+            count("*").alias("bulls_count"),
+            avg("priceRub").alias("avg_price")
+        )\
+        .select(
+            col("time_window.start").alias("window_start"),
+            col("time_window.end").alias("window_end"),
+            "manufacturer",
+            "bulls_count",
+            "avg_price"
+        )
     
     df_dwh = df.select(
         *df.columns,
@@ -141,6 +176,13 @@ def main():
     .withColumn("conditionKey", xxhash64(*condition_columns))
     fact_table = df_dwh.select(*fact_columns)
 
+    df_monitoring\
+    .writeStream\
+    .foreachBatch(write_jdbc)\
+    .trigger(processingTime="10 minutes")\
+    .option("checkpointLocation", "/checkpoints/monitoring-checkpoints")\
+    .outputMode("append")\
+    .start()
 
     fact_table.select(
         to_json(
