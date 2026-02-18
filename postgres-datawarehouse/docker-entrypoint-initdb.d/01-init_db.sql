@@ -61,3 +61,12 @@ CREATE TABLE IF NOT EXISTS common_analytics.monitoring (
         avg_price DECIMAL(10,2)
     );
 
+CREATE VIEW IF NOT EXISTS common_analytics.car AS 
+SELECT * FROM dim_car;
+
+CREATE VIEW IF NOT EXISTS common_analytics.condition AS 
+SELECT * FROM dim_condition;
+
+CREATE VIEW IF NOT EXISTS common_analytics.date AS 
+SELECT * FROM dim_date;
+

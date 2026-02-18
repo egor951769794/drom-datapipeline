@@ -27,7 +27,7 @@ class BulletinScraper:
 
         
     def get_page(self, url):
-        res = self.request.get_request(url=url, max_retries=5, tag_to_check=TAG_CHECKS['bulletins_list'], sleep_for=15)
+        res = self.request.get_request(url=url, max_retries=5, tag_to_check=TAG_CHECKS['bulletins_list'], sleep_for=24)
         if res is None:
             self.system_log(f"Unable to get proper bulletins page response. Quitting...")
             sys.exit(1)

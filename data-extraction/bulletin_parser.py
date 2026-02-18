@@ -110,7 +110,7 @@ class BulletinParser:
     def encode_images(self, image_url_list):
         encoded_images = []
         for image_url in image_url_list:
-            encoded_images.append(self.request.get_request(image_url, max_retries=1, sleep_for=2).content)
+            encoded_images.append(self.request.get_request(image_url, max_retries=1, sleep_for=3).content)
         return encoded_images
 
     def generate_image_id(self, url):
@@ -214,7 +214,7 @@ class BulletinParser:
     
     def get_additional_bull_info(self, url):
         
-        r = self.request.get_request(url, max_retries=3, tag_to_check=TAG_CHECKS['bulletin'], sleep_for=7)
+        r = self.request.get_request(url, max_retries=3, tag_to_check=TAG_CHECKS['bulletin'], sleep_for=8)
 
         color = steering = passportIssues = company = penalties = owners = prevBulls = date = additionalPhotos = None
 

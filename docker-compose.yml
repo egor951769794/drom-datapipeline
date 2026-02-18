@@ -16,8 +16,7 @@ services:
       KAFKA_CONTROLLER_QUORUM_VOTERS: 1@kafka-1:9093,2@kafka-2:9093,3@kafka-3:9093
       KAFKA_INTER_BROKER_LISTENER_NAME: INTERNAL
       KAFKA_LOG_DIRS: /var/lib/kafka/data
-      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
-      KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 1
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 3
       KAFKA_AUTO_LEADER_REBALANCE_ENABLE: "true"
       KAFKA_LEADER_IMBALANCE_PER_BROKER_PERCENTAGE: "10"
       KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: 1
@@ -45,10 +44,9 @@ services:
       KAFKA_CONTROLLER_QUORUM_VOTERS: 1@kafka-1:9093,2@kafka-2:9093,3@kafka-3:9093
       KAFKA_INTER_BROKER_LISTENER_NAME: INTERNAL
       KAFKA_LOG_DIRS: /var/lib/kafka/data
-      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 3
       KAFKA_AUTO_LEADER_REBALANCE_ENABLE: "true"
       KAFKA_LEADER_IMBALANCE_PER_BROKER_PERCENTAGE: "10"
-      KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 1
       KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: 1
       KAFKA_GROUP_INITIAL_REBALANCE_DELAY_MS: 0
       KAFKA_LOG_RETENTION_HOURS: 1
@@ -74,10 +72,9 @@ services:
       KAFKA_CONTROLLER_QUORUM_VOTERS: 1@kafka-1:9093,2@kafka-2:9093,3@kafka-3:9093
       KAFKA_INTER_BROKER_LISTENER_NAME: INTERNAL
       KAFKA_LOG_DIRS: /var/lib/kafka/data
-      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 3
       KAFKA_AUTO_LEADER_REBALANCE_ENABLE: "true"
       KAFKA_LEADER_IMBALANCE_PER_BROKER_PERCENTAGE: "10"
-      KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 1
       KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: 1
       KAFKA_GROUP_INITIAL_REBALANCE_DELAY_MS: 0
       KAFKA_LOG_RETENTION_HOURS: 1
@@ -98,6 +95,7 @@ services:
       "
       echo -e 'Initializing kafka cluster topics...'
       while [ $(/opt/kafka/bin/kafka-broker-api-versions.sh --bootstrap-server kafka-1:9091 | wc -l) -lt 3 ]; do
+        echo -e 'Some kafka brokers are unavailable at the moment. Waiting for them for topic initialization...'
         sleep 3;
       done;
       echo -e 'All kafka brokers are available. Creating topics...'
@@ -114,7 +112,7 @@ services:
   spark:
     build: pyspark-transforms/
     ports:
-      - 7077:7077
+      - 4040:4040
     profiles: ['spark']
     volumes:
       - spark-checkpoints:/checkpoints
@@ -270,5 +268,3 @@ volumes:
   pgdata:
   redis:
   superset_db_data:
-  pgdata_test:
-  

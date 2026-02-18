@@ -27,10 +27,23 @@ class RequestModule:
         if output_mode == 'console':
             print("[" + str(datetime.now()) + "][BulletinScraper] ", msg, "\n")
 
+    def check_429(self, page):
+        return False
+
     def get_request(self, url, max_retries=3, current_try=1, tag_to_check=None, sleep_for=10):
         try:
             response = requests.get(url, headers = {'User-agent': REQUEST_USER_AGENT})
             sleep(sleep_for, sleep_for / 4)
+
+            if self.check_429(response.text):
+                self.system_log(f"Request error 429: Too Many Requests occured. Freezing for 10 minutes...")
+                sleep(600, 5)
+
+                if current_try < max_retries:
+                    return self.get_request(url=url, max_retries=max_retries, current_try=current_try+1, tag_to_check=tag_to_check, sleep_for=sleep_for*1.2)
+                
+                self.log(f"Couldnt get response after 429 error encounter after {max_retries} retries")
+                return None
 
             if tag_to_check and isinstance(tag_to_check[0], list):
                 if current_try > 1:
@@ -61,44 +74,33 @@ class RequestModule:
             elif tag_to_check and self.check_tag(response, tag_to_check[0], tag_to_check[1]):
                 return response
             
-            elif "text/html" not in response.headers.get('content-type') or self.check_tag(response):
+            elif "text/html" not in response.headers.get('content-type') or (self.check_tag(response) and not tag_to_check):
                 return response
             
             elif current_try < max_retries:
                 sleep(6, 2)
                 self.log(f"Got incorrect response. Will perform another {max_retries - current_try} tries")
-                return self.get_request(url=url, max_retries=max_retries, current_try=current_try+1, tag_to_check=tag_to_check)
+                return self.get_request(url=url, max_retries=max_retries, current_try=current_try+1, tag_to_check=tag_to_check, sleep_for=sleep_for*1.2)
   
             self.log(f"Got incorrect response after {max_retries} retries")
             return None
             
         except requests.exceptions.HTTPError as http_error:
-            if http_error.status == 429:
-                self.system_log(f"Request error 429: Too Many Requests occured. Retry-After values was: {response.headers['Retry-After']}. Freezing for time specified...")
-                sleep(int(response.headers['Retry-After']) + 3, 0)
+            self.system_log(f"Exception with status code {http_error.status} occured in get_request during try №{current_try}")
+            sleep(6, 2)
 
-                if current_try < max_retries:
-                    return self.get_request(url=url, max_retries=max_retries, current_try=current_try+1, tag_to_check=tag_to_check)
-                
-                self.log(f"Couldnt get response after 429 error encounter after {max_retries} retries")
-                return None
-                
-            else:
-                self.system_log(f"Exception with status code {http_error.status} occured in get_request during try №{current_try}")
-                sleep(6, 2)
-
-                if current_try < max_retries:
-                    return self.get_request(url=url, max_retries=max_retries, current_try=current_try+1, tag_to_check=tag_to_check)
-                
-                self.log(f"Couldnt get response after HTTP error encounter after {max_retries} retries")
-                return None
+            if current_try < max_retries:
+                return self.get_request(url=url, max_retries=max_retries, current_try=current_try+1, tag_to_check=tag_to_check, sleep_for=sleep_for*1.2)
+            
+            self.log(f"Couldnt get response after HTTP error encounter after {max_retries} retries")
+            return None
         
         except Exception as e:
             self.system_log(f"Unknown exception occured in get_request during try №{current_try}: {e}")
             sleep(6, 2)
 
             if current_try < max_retries:
-                return self.get_request(url=url, max_retries=max_retries, current_try=current_try+1, tag_to_check=tag_to_check)
+                return self.get_request(url=url, max_retries=max_retries, current_try=current_try+1, tag_to_check=tag_to_check, sleep_for=sleep_for*1.2)
 
             self.log(f"Couldnt get response after unknown error encounter after {max_retries} retries")
             return None

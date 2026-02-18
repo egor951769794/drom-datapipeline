@@ -15,10 +15,17 @@ packages = [
 
 def create_session() -> SparkSession:
     spark = SparkSession.builder\
-        .master('local[2]')\
+        .master('local[4]')\
         .appName('DWH Star Schema creator')\
-        .config("spark.sql.shuffle.partitions", "5")\
+        .config("spark.sql.shuffle.partitions", "4")\
+        .config('spark.driver.memory', '512m') \
         .config('spark.jars.packages', ",".join(packages))\
+        .config("spark.serializer", "org.apache.spark.serializer.KryoSerializer")\
+        .config('spark.kryoserializer.buffer.max', '64m') \
+        .config('spark.driver.extraJavaOptions', 
+            '-XX:MaxGCPauseMillis=50 -XX:InitiatingHeapOccupancyPercent=35 -XX:+UnlockExperimentalVMOptions -XX:+UseZGC') \
+        .config("spark.sql.execution.arrow.pyspark.enabled", "true") \
+        .config("spark.sql.execution.arrow.pyspark.fallback.enabled", "false") \
         .getOrCreate()
     
     return spark
@@ -189,7 +196,7 @@ def main():
             struct(*fact_table.columns)
         ).alias("value")
     ).writeStream\
-    .trigger(processingTime='5 seconds')\
+    .trigger(processingTime='15 seconds')\
     .format("kafka")\
     .option("kafka.bootstrap.servers", KAFKA_BROKERS)\
     .option("topic", "dwh.table.facts")\
@@ -202,7 +209,7 @@ def main():
             struct(*dim_condition.columns)
         ).alias("value")
     ).writeStream\
-    .trigger(processingTime='5 seconds')\
+    .trigger(processingTime='30 seconds')\
     .format("kafka")\
     .option("kafka.bootstrap.servers", KAFKA_BROKERS)\
     .option("topic", "dwh.table.condition")\
@@ -215,7 +222,7 @@ def main():
             struct(*dim_date.columns)
         ).alias("value")
     ).writeStream\
-    .trigger(processingTime='5 seconds')\
+    .trigger(processingTime='30 seconds')\
     .format("kafka")\
     .option("kafka.bootstrap.servers", KAFKA_BROKERS)\
     .option("topic", "dwh.table.date")\
@@ -228,7 +235,7 @@ def main():
             struct(*dim_car.columns)
         ).alias("value")
     ).writeStream\
-    .trigger(processingTime='5 seconds')\
+    .trigger(processingTime='30 seconds')\
     .format("kafka")\
     .option("kafka.bootstrap.servers", KAFKA_BROKERS)\
     .option("topic", "dwh.table.car")\
