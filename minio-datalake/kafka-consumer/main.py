@@ -9,6 +9,8 @@ import boto3
 from kafka import KafkaConsumer, OffsetAndMetadata
 from kafka.errors import NoBrokersAvailable
 
+from PIL import Image
+
 from constants import BUCKET_BULLETINS, BUCKET_BULLETINPICS, CONSUMER_BOOTSTRAP_SERVERS, BULLETIN_HASH_FIELDS
 
 
@@ -112,7 +114,17 @@ class BulletinPicsKafkaConsumer(ThreadKafkaConsumer):
         super().__init__(topic, group_id, bootstrap_servers, session, max_poll)
 
     def process_message(self, msg, session):
-        session.upload_fileobj(BytesIO(msg.value), BUCKET_BULLETINPICS, msg.key.decode('utf-8') + '.jpg')
+        pic = Image.open(BytesIO(msg.value))
+        if pic.mode in ("RGBA", "P"):
+            pic = pic.convert("RGB")
+        w, h = pic.size
+        pic = pic.resize( (int(w/2), int(h/2)), Image.LANCZOS)
+    
+        buffer = BytesIO()
+        pic.save(buffer, format='JPEG', quality=70, optimize=True)
+        buffer.seek(0)
+
+        session.upload_fileobj(buffer, BUCKET_BULLETINPICS, msg.key.decode('utf-8') + '.jpg')
 
         
 def main():

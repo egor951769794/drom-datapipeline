@@ -1,3 +1,9 @@
 kafka-python
 numpy
 beautifulsoup4
+notebook
+psycopg2-binary
+matplotlib
+catboost
+boto3
+Pillow
