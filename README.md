@@ -93,7 +93,11 @@ Apache Superset
 
 ![Superset Chart 2](readme_images/manufacturers-share-new-used.jpg)
 
-![Superset Chart 3](readme_images/manufacturers-share-car-year.jpg)
+![Superset Chart 3](readme_images/engine_types.png)
+
+![Superset Chart 4](readme_images/price_scatter.png)
+
+![Superset Chart 5](readme_images/brands_boxplot.png)
 
 ---
 
