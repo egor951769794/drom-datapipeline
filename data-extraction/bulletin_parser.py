@@ -125,7 +125,7 @@ class BulletinParser:
         car['imageUrls'] = [pic.attrs['src'] for pic in bull.find('div', {'data-ftid': 'bull_image'}).find_all('img')]
 
         car_name = bull.find('h3').text.split(sep=', ')[0]
-        car['manufacturer'] = [mf for mf in MANUFACTURERS if mf in car_name][0]
+        car['manufacturer'] = [mf for mf in MANUFACTURERS if mf.lower() in car_name.lower()][0]
         car['model'] = car_name.replace(car['manufacturer'], "")[1:]
         car['year'] = int(bull.find('h3').text.split(sep=', ')[1])
         if bull.find('div', {"data-ftid": "bull_subtitle"}):

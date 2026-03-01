@@ -132,6 +132,7 @@ def main():
         .option('kafka.bootstrap.servers', KAFKA_BROKERS)\
         .option('subscribe', 'drom.bulletin.posted')\
         .option("startingOffsets", "latest")\
+        .option("failOnDataLoss", "false")\
         .load()\
         .selectExpr("CAST(value AS STRING) AS json")
     

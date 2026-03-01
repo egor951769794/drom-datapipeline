@@ -70,3 +70,12 @@ SELECT * FROM dim_condition;
 CREATE VIEW IF NOT EXISTS common_analytics.date AS 
 SELECT * FROM dim_date;
 
+drop materialized view if exists common_analytics.date_series;
+
+create materialized view common_analytics.date_series as 
+select generate_series(
+	date_trunc('year', now())::date,
+	date_trunc('year', now())::date + interval '364 days',
+	'1 day'::interval
+)::date as date_val
+
